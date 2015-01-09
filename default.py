@@ -150,7 +150,14 @@ def loadMovies(page = 1, intheaters = True):
 			else:
 				addDirectoryItem(__language__(movie['title']), movie['id'], "comingweek", "")
 		else:
-			addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/140x200/%s.png" % movie['id'])
+			quality = int(__addon__.getSetting( 'Quality' ))
+			log(quality)
+			if (quality == 2):
+				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/140x200/%s.png" % movie['id'])
+			elif (quality == 1):
+				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/235x336/%s.jpg" % movie['id'])
+			else:
+				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/big/%s.jpg" % movie['id'])
 	xbmcplugin.endOfDirectory(thisPlugin)
 
 def loadDates(offset = 0):
@@ -173,7 +180,11 @@ def loadDates(offset = 0):
 def loadVideos(id):
 	global thisPlugin
 	for video in getMoviesVideos(id):
-		addLinkItem(video['name'], video['vid'], "videourl", "http://mr.comingsoon.it/imgdb/video/%s_icov.jpg" % video['vid'])
+		quality =int(__addon__.getSetting( 'Quality' ))
+		if (quality == 2):
+			addLinkItem(video['name'], video['vid'], "videourl", "http://mr.comingsoon.it/imgdb/video/%s_icov.jpg" % video['vid'])
+		else:
+			addLinkItem(video['name'], video['vid'], "videourl", "http://mr.comingsoon.it/imgdb/video/%s_big.jpg" % video['vid'])
 	xbmcplugin.endOfDirectory(thisPlugin)
 
 def watchVideo(id):
