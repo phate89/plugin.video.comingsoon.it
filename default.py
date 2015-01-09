@@ -151,7 +151,6 @@ def loadMovies(page = 1, intheaters = True):
 				addDirectoryItem(__language__(movie['title']), movie['id'], "comingweek", "")
 		else:
 			quality = int(__addon__.getSetting( 'Quality' ))
-			log(quality)
 			if (quality == 2):
 				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/140x200/%s.png" % movie['id'])
 			elif (quality == 1):
@@ -190,10 +189,13 @@ def loadVideos(id):
 def watchVideo(id):
 	urls = getVideoUrls(id)
 	url = ""
-	if ('hd' in urls):
+	PreferHD = (__addon__.getSetting( 'PreferHD' ) == 'true')
+	if (PreferHD and 'hd' in urls):
 		url = urls['hd']
 	elif ('sd' in urls):
 		url = urls['sd']
+	elif ('hd' in urls):
+		url = urls['hd']
 	else:
 		log('No links found')
 		return
