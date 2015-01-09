@@ -145,7 +145,7 @@ def loadMovies(page = 1, intheaters = True):
 	global thisPlugin
 	for movie in getMoviesList(page, intheaters):
 		if (isinstance( movie['title'], ( int, long ) )):
-			if ( movie['title'] == 32001):
+			if ( movie['title'] == 32002):
 				addDirectoryItem(__language__(movie['title']), movie['id'], "moviesintheaters", "")
 			else:
 				addDirectoryItem(__language__(movie['title']), movie['id'], "comingweek", "")
@@ -164,9 +164,9 @@ def loadDates(offset = 0):
 	if days_behind < 0: # Target day already happened this week
 		days_behind += 7
 	nextthursday = d - datetime.timedelta(days_behind)
-	addDirectoryItem(__language__(32001), offset - 63, "moviescomingsoon", "")
 	for x in range(0,9):
 		addDirectoryItem(__language__(32007) + " " + str(nextthursday + datetime.timedelta(x * 7)), offset + (x * 7), "comingweek"	, "")
+	addDirectoryItem(__language__(32001), offset - 63, "moviescomingsoon", "")
 	addDirectoryItem(__language__(32002), offset + 63, "moviescomingsoon", "")
 	xbmcplugin.endOfDirectory(thisPlugin)
 
@@ -221,7 +221,7 @@ else:
 			loadDates(params['id'])
 		else:
 			loadDates()
-	if params['mode'] == "comingweek":
+	elif params['mode'] == "comingweek":
 		if ("id" in params):
 			loadMovies(params['id'], False)
 		else:
