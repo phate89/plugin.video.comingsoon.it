@@ -2,8 +2,9 @@ import xbmc, xbmcaddon, xbmcgui, xbmcplugin
 import datetime, re, sys, urllib2
 from bs4 import BeautifulSoup
 
-addon = xbmcaddon.Addon()
-addonID = addon.getAddonInfo('id')
+__addon__ = xbmcaddon.Addon()
+__language__ = __addon__.getLocalizedString
+addonID = __addon__.getAddonInfo('id')
 thisPlugin = int(sys.argv[1])
 
 home = "http://www.comingsoon.it"
@@ -77,10 +78,10 @@ def getMoviesList(page = 1, intheaters = True):
 				if (intheaters):
 					next = bpage.find("li", attrs={"class": "next-last "})
 					if (next):
-						movies.append( { "id": page + 1,  "title": "Pagina successiva" } )
+						movies.append( { "id": page + 1,  "title": 32002 } )
 				else:
-					movies.append( { "id": page - 7,  "title": "Settimana precedente" } )
-					movies.append( { "id": page + 7,  "title": "Settimana successiva" } )
+					movies.append( { "id": page - 7,  "title": 32003 } )
+					movies.append( { "id": page + 7,  "title": 32004 } )
 	return movies
 
 def getMoviesVideos(id):
@@ -136,17 +137,18 @@ def addLinkItem(label, id, mode, iconImage, description="", duration=""):
 
 def loadList():
 	global thisPlugin
-	addDirectoryItem("Film in sala", "", "moviesintheaters", "")
-	addDirectoryItem("Film in uscita prossimamente", "", "moviescomingsoon", "")
+	addDirectoryItem(__language__(32005), "", "moviesintheaters", "")
+	addDirectoryItem(__language__(32006), "", "moviescomingsoon", "")
 	xbmcplugin.endOfDirectory(thisPlugin)
 
 def loadMovies(page = 1, intheaters = True):
 	global thisPlugin
 	for movie in getMoviesList(page, intheaters):
-		if (intheaters and movie['title'] == "Pagina successiva"):
-			addDirectoryItem(movie['title'], movie['id'], "moviesintheaters", "")
-		elif ((not intheaters) and (movie['title'] == "Settimana precedente" or movie['title'] == "Settimana successiva")):
-			addDirectoryItem(movie['title'], movie['id'], "comingweek", "")
+		if (isinstance( movie['title'], ( int, long ) )):
+			if ( movie['title'] == 32001):
+				addDirectoryItem(__language__(movie['title']), movie['id'], "moviesintheaters", "")
+			else:
+				addDirectoryItem(__language__(movie['title']), movie['id'], "comingweek", "")
 		else:
 			addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/140x200/%s.png" % movie['id'])
 	xbmcplugin.endOfDirectory(thisPlugin)
@@ -162,10 +164,10 @@ def loadDates(offset = 0):
 	if days_behind < 0: # Target day already happened this week
 		days_behind += 7
 	nextthursday = d - datetime.timedelta(days_behind)
-	addDirectoryItem("Pagina precedente", offset - 63, "moviescomingsoon", "")
+	addDirectoryItem(__language__(32001), offset - 63, "moviescomingsoon", "")
 	for x in range(0,9):
-		addDirectoryItem("In uscita il " + str(nextthursday + datetime.timedelta(x * 7)), offset + (x * 7), "comingweek"	, "")
-	addDirectoryItem("Pagina successiva", offset + 63, "moviescomingsoon", "")
+		addDirectoryItem(__language__(32007) + " " + str(nextthursday + datetime.timedelta(x * 7)), offset + (x * 7), "comingweek"	, "")
+	addDirectoryItem(__language__(32002), offset + 63, "moviescomingsoon", "")
 	xbmcplugin.endOfDirectory(thisPlugin)
 
 def loadVideos(id):
