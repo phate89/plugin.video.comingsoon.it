@@ -34,7 +34,7 @@ def getMoviesList(page = 1, intheaters = True):
 	else:
 		content =  loadPage(home + "/cinema/calendariouscite/?r=" + str(page))
 	if (content):
-		bpage = BeautifulSoup(content)
+		bpage = BeautifulSoup(content, "html.parser")
 		if (bpage):
 			htmlmovies = bpage.find_all("div", attrs={"class": "cs-component__products-list-item"})
 			if (htmlmovies):
@@ -88,7 +88,7 @@ def getMoviesVideos(id):
 	videos = []
 	content =  loadPage("http://www.comingsoon.it/film/movie/%s/video/" % str(id)) # url http://www.comingsoon.it/film/something/{movieid}/scheda/
 	if (content):
-		page = BeautifulSoup(content)
+		page = BeautifulSoup(content, "html.parser")
 		if (page):
 			htmlrows = page.find_all("div", attrs={"class": "cs-components__vertical-big-player-moviesrow"})
 			if (htmlrows):
