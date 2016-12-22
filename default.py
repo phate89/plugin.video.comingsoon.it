@@ -1,258 +1,255 @@
-import xbmc, xbmcaddon, xbmcgui, xbmcplugin
-import datetime, re, sys, urllib2
-from bs4 import BeautifulSoup
-
-__addon__ = xbmcaddon.Addon()
-__language__ = __addon__.getLocalizedString
-addonID = __addon__.getAddonInfo('id')
-thisPlugin = int(sys.argv[1])
+import datetime, re
+from phate89lib import rutils, kodiutils, staticutils
 
 home = "http://www.comingsoon.it"
+webutils=rutils.RUtils()
+rutils.log=kodiutils.log
+webutils.USERAGENT = "Comingsoon video addon"
 
-def log(msg, force = False):
-	if force:
-		xbmc.log((u'### [' + addonID + u'] - ' + str(msg)).encode('utf-8'), level = xbmc.LOGNOTICE)
-	else:
-		xbmc.log((u'### [' + addonID + u'] - ' + str(msg)).encode('utf-8'), level = xbmc.LOGDEBUG)
+#site logic
 
-def loadPage(url):
-	req = urllib2.Request(url)
-	req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; rv:29.0) Gecko/20100101 Firefox/29.0')
-	try:
-		response = urllib2.urlopen(req)
-		code = response.read().decode("utf-8")
-		response.close()
-	except:
-		return False
-	return code
+def getTheatersList(page = 1, fullDetails = False):
+    return getMoviesList("{home}/cinema/filmalcinema/?page={page}".format(home=home,page=page), fullDetails)
 
-def getMoviesList(page = 1, intheaters = True):
-	try: 
-		page = int(page)
-	except:
-		page = 1
-	movies = []
-	if (intheaters):
-		content =  loadPage(home + "/cinema/filmalcinema/?page=" + str(page))
-	else:
-		content =  loadPage(home + "/cinema/calendariouscite/?r=" + str(page))
-	if (content):
-		bpage = BeautifulSoup(content, "html.parser")
-		if (bpage):
-			htmlmovies = bpage.find_all("a", attrs={"class": "col-xs-12 cinema"})
-			if (htmlmovies):
-				for htmlmovie in htmlmovies:
-					if (htmlmovie and htmlmovie.has_attr('href')):
-						res = re.search(".*?\/.*?\/([0-9]+)\/scheda\/", htmlmovie['href'])
-						if (res):
-							id = res.group(1)						
-							titolo = ""
-							titolooriginale = ""
-							data = ""
-							genere = ""
-							nazione = ""
-							anno = ""
-							regia = ""
-							cast = ""
-							div = htmlmovie.find("div", attrs={"class": "h3 titolo cat-hover-color anim25"})
-							if (div):
-								titolo= div.string
-							div = htmlmovie.find("div", attrs={"class": "h5 sottotitolo"})
-							if (div):
-								titolo= div.string
-							ul = htmlmovie.find("ul", attrs={"class": "col-xs-9 box-descrizione"})
-							if (ul):
-								infos = ul.find_all('li')
-								if (infos):
-									for info in infos:
-										if (info.span):
-											if (info.span.string == 'DATA USCITA'):
-												data = info.contents[1][1:].strip()
-											elif (info.span.string == 'GENERE'):
-												genere = info.contents[1][1:].strip()
-											elif (info.span.string == 'NAZIONALITA&#39;'):
-												nazione = info.contents[1][1:].strip()
-											elif (info.span.string == 'ANNO'):
-												anno = info.contents[1][1:].strip()
-											elif (info.span.string == 'REGIA'):
-												regia = info.contents[1][1:].strip()
-											elif (info.span.string == 'CAST'):
-												cast = info.contents[1][1:].strip()
-							movies.append( { "id": id,  "title": titolo, "originaltitle": titolooriginale, "date": data, "genre": genere, "nation": nazione, "year": anno, "director": regia, "cast": cast } )
-				if (intheaters):
-					ul = bpage.find("ul", attrs={"class": "pagination"})
-					if (ul):
-						pages = ul.find_all('li')
-						if (pages):
-							first = pages[0].a
-							if (not (first and first.has_attr("class") and 'disattivato' in first["class"])):
-								movies.append( { "id": page - 1,  "title": 32001 } )
-							last = pages[-1].a
-							if (not (last and last.has_attr("class") and 'disattivato' in last["class"])):
-								movies.append( { "id": page + 1,  "title": 32002 } )
-				else:
-					movies.append( { "id": page - 7,  "title": 32003 } )
-					movies.append( { "id": page + 7,  "title": 32004 } )
-	return movies
+def getNextReleasesList(offsetDays = 0, fullDetails = False):
+    return getMoviesList("{home}/cinema/calendariouscite/?r={offsetDays}".format(home=home,offsetDays=offsetDays), fullDetails)
 
-def getMoviesVideos(id):
-	videos = []
-	content =  loadPage("http://www.comingsoon.it/film/movie/%s/video/" % str(id)) # url http://www.comingsoon.it/film/something/{movieid}/scheda/
-	if (content):
-		page = BeautifulSoup(content, "html.parser")
-		if (page):
-			htmlrows = page.find_all("div", attrs={"class": "video-player-xl-articolo video-player-xl-sinistra"})
-			if (htmlrows):
-				for htmlrow in htmlrows:
-					htmlvideos = htmlrow.find_all('a')
-					if (htmlvideos):
-						for htmlvideo in htmlvideos:
-							res = re.search(".*?\/.*?\/[0-9]+\/video\/\?vid=([0-9]+)", htmlvideo['href'])
-							if (res):
-								vid = res.group(1)
-								nome = ""
-								div = htmlvideo.find("div", attrs={"class": "h6 descrizione"})
-								if (div):
-									nome = div.string
-							videos.append( { "vid": vid,  "name": nome } )
-		return videos
-							
-def getVideoUrls(vid):
-	videourls = {}
-	content =  loadPage("http://www.comingsoon.it/VideoPlayer/embed/?ply=1&idv=" + str(vid))
-	if (content):
-		res = re.search('vLwRes\:.*?\"(.*?)\"', content)
-		if (res):
-			videourls['sd'] = "http://video.comingsoon.it/" + res.group(1)
-		res = re.search('vHiRes\:.*?\"(.*?)\"', content)
-		if (res):
-			videourls['hd'] = "http://video.comingsoon.it/" + res.group(1)
-	return videourls
+def getMoviesList(url, fullDetails = False):
+    bpage = webutils.getSoup(url)
+    if not bpage:
+        return -1, []
+    htmlmovies = bpage.find_all("a", attrs={"class": "col-xs-12 cinema"})
+    if not htmlmovies:
+        return -1, []
+    movies = []
+    for htmlmovie in htmlmovies:
+        if (htmlmovie and htmlmovie.has_attr('href')):
+            res = re.search(".*?\/.*?\/([0-9]+)\/scheda\/", htmlmovie['href'])
+            if res:
+                if (fullDetails):
+                    movie = getFullMovieDetails(res.group(1))
+                else:
+                    movie = getBaseMovieDetails(htmlmovie)
+                movie['id'] = res.group(1)
+                movie['image']='https://mr.comingsoon.it/imgdb/locandine/big/{id}.jpg'.format(id=movie['id'])
+                movies.append( movie )
+    lastPage=-1
+    i = bpage.find("i", attrs={"class": "fa fa-fast-forward"})
+    if i and len(i.parent['class']) > 0 and not 'disattivato' in i.parent['class']:
+        lastPage = i.parent['href'].split('=')[-1]
+    return lastPage, movies
 
-def addDirectoryItem(label, id, mode, iconImage):
-	url = sys.argv[0]+"?id="+str(id)+"&mode="+str(mode)
-	li = xbmcgui.ListItem(label, iconImage="DefaultFolder.png", thumbnailImage=iconImage)
-	li.setInfo(type="Video", infoLabels={"title": label})
-	return xbmcplugin.addDirectoryItem(handle=thisPlugin, url=url, listitem=li, isFolder=True)
-	
-def addLinkItem(label, id, mode, iconImage, description="", duration=""):
-	url = sys.argv[0]+"?id="+str(id)+"&mode="+str(mode)
-	li = xbmcgui.ListItem(label, iconImage="DefaultVideo.png", thumbnailImage=iconImage)
-	if duration == "":
-		li.setInfo(type="Video", infoLabels={"title": label, "plot": description})
-	else:
-		li.setInfo(type="Video", infoLabels={"title": label, "plot": description, "duration": str(round(int(duration)/60,0))})
-		li.addStreamInfo("video", {"duration": int(duration)})
-	li.setProperty('IsPlayable', 'true')
-	return xbmcplugin.addDirectoryItem(handle=thisPlugin, url=url, listitem=li, isFolder=False) 
+def getBaseMovieDetails(htmlmovie):
+    movie = {}
+    div = htmlmovie.find("div", attrs={"class": "h3 titolo cat-hover-color anim25"})
+    if (div):
+        movie['title'] = div.string
+    div = htmlmovie.find("div", attrs={"class": "h5 sottotitolo"})
+    if (div):
+        movie['originaltitle'] = div.string
+    ul = htmlmovie.find("ul", attrs={"class": "col-xs-9 box-descrizione"})
+    if (ul):
+        infos = ul.find_all('li')
+        if (infos):
+            for info in infos:
+                if (info.span):
+                    if (info.span.string == 'ANNO'):
+                        movie['year'] = info.contents[1][1:].strip()
+                    elif (info.span.string == 'DATA USCITA'):
+                        movie['premiered'] = info.contents[1][1:].strip()
+                    elif (info.span.string == 'GENERE'):
+                        movie['genre'] = info.contents[1][1:].strip().replace(',', '/')
+                    elif (info.span.string == 'NAZIONALITA&#39;'):
+                        movie['country'] = info.contents[1][1:].strip().replace(',', '/')
+                    elif (info.span.string == 'REGIA'):
+                        movie['director'] = info.contents[1][1:].strip().replace(',', '/')
+                    elif (info.span.string == 'CAST'):
+                        movie['cast'] = info.contents[1][1:].strip().split(", ")
+    return movie
+
+def getFullMovieDetails(id):
+    page = webutils.getSoup("{home}/film/movie/{id}/scheda/".format(home=home, id=id))
+    if not page:
+        return {}
+    frame = page.find("div", attrs={"class": "contenitore-scheda col-xs-12"})
+    if not frame:
+        return {}
+    movie = {}
+    res = page.find("h1", attrs={"class": "titolo scheda col-sm-10"})
+    if res:
+            movie['title'] = res.string
+    res = page.find("p", attrs={"class": "box-dati col-xs-12 h4"})
+    if res:
+            movie['originaltitle'] = res.string
+    res = frame.find("div", attrs={"id": "voto-pubblico"})
+    if res:
+            movie['userrating'] = float(res['data-rating'])*2
+    res = frame.find("div", attrs={"class": "voto voto-comingsoon col-xs-12 col-sm-4 h6"})
+    if res:
+            movie['rating'] = float(res['data-rating'])
+    res = frame.find("div", attrs={"class": "voto voto-comingsoon col-xs-12 col-sm-4 h6"})
+    if res:
+            movie['rating'] = float(res['data-rating'])*2
+    res = frame.find("div", attrs={"class": "contenuto-scheda-destra col-xs-8"})
+    if res:
+            movie['plot'] = res.contents[-4].string
+    res = frame.find("div", attrs={"class": "box-descrizione"})
+    if res:
+        uls = res.find_all('ul')
+        if uls:
+            for ul in uls:
+                infos = ul.find_all('li')
+                if (infos):
+                    for info in infos:
+                        if (info.span):
+                            field = info.span.string
+                            info.span.extract()
+                            movie['studio'] = ''
+                            if (field == 'ANNO'):
+                                movie['year'] = info.text.strip()[2:]
+                            if (field == 'DATA USCITA'):
+                                movie['premiered'] = info.time['datetime']
+                            elif (field == 'GENERE'):
+                                movie['genre'] = info.text.strip()[2:].replace(', ', ' / ')
+                            elif (field == 'PAESE'):
+                                movie['country'] = info.text.strip()[2:].replace(', ', ' / ')
+                            elif (field == 'REGIA'):
+                                movie['director'] = info.text.strip()[2:].replace(', ', ' / ')
+                            elif (field == 'ATTORI'):
+                                movie['cast'] = info.text.strip()[2:].split(", ")
+                            elif (field == 'SCENEGGIATURA'):
+                                movie['writer'] = info.text.strip()[2:].replace(', ', ' / ')
+                            elif (field == 'PRODUZIONE'):
+                                movie['studio'] += info.text.strip().rstrip(':')[2:].replace(', ', ' / ') + ' / '
+                            elif (field == 'DISTRIBUZIONE'):
+                                movie['studio'] += info.text.strip().rstrip(':')[2:].replace(', ', ' / ') + ' / '
+                            elif (field == 'DURATA'):
+                                try:
+                                    movie['duration'] = int(info.text.strip()[2:].split(" ")[0])
+                                except:
+                                    pass
+    return movie
+
+def getMovieVideos(id):
+    page = webutils.getSoup("http://www.comingsoon.it/film/movie/{id}/video/".format(id=id)) # url http://www.comingsoon.it/film/something/{movieid}/scheda/
+    if not page:
+        return []
+    videos = []
+    #load the main video
+    htmlvideo = page.find("link", attrs={"rel": "canonical"})
+    if htmlvideo:
+        firstvid = htmlvideo['href'].split('=')[-1]
+        nome = ""
+        div = page.find("div", attrs={"class": "h5 descrizione"})
+        if div:
+            nome = div.string
+        videos.append( { "id": firstvid,  "title": nome, "image": "http://mr.comingsoon.it/imgdb/video/{id}_big.jpg".format(id=firstvid) } )
+    #search other videos
+    htmlrows = page.find_all("div", attrs={"class": "video-player-xl-articolo video-player-xl-sinistra"})
+    if htmlrows:
+        for htmlrow in htmlrows:
+            htmlvideos = htmlrow.find_all('a')
+            if htmlvideos:
+                for htmlvideo in htmlvideos:
+                    vid = htmlvideo['href'].split('=')[-1]
+                    if vid != firstvid:
+                        div = htmlvideo.find("div", attrs={"class": "h6 descrizione"})
+                        if div:
+                            videos.append( { "id": vid,  "title": div.string, "image": "http://mr.comingsoon.it/imgdb/video/{id}_big.jpg".format(id=vid) } )
+    return videos
+
+def getVideoUrls(id):
+    videourls = {}
+    content =  webutils.getText("http://www.comingsoon.it/VideoPlayer/embed/?ply=1&idv=" + str(id))
+    if (content):
+        res = re.search('vLwRes\:.*?\"(.*?)\"', content)
+        if res:
+            videourls['sd'] = "http://video.comingsoon.it/" + res.group(1)
+        else:
+            res = re.search('vStart\:.*?\"(.*?)\"', content)
+            if res:
+                videourls['sd'] = "http://video.comingsoon.it/" + res.group(1)
+        res = re.search('vHiRes\:.*?\"(.*?)\"', content)
+        if res:
+            videourls['hd'] = "http://video.comingsoon.it/" + res.group(1)
+    return videourls
+
+#addon logic
 
 def loadList():
-	global thisPlugin
-	addDirectoryItem(__language__(32005), "", "moviesintheaters", "")
-	addDirectoryItem(__language__(32006), "", "moviescomingsoon", "")
-	xbmcplugin.endOfDirectory(thisPlugin)
+    kodiutils.addListItem(kodiutils.LANGUAGE(32005), {"mode": "moviesintheaters"})
+    kodiutils.addListItem(kodiutils.LANGUAGE(32006), {"mode": "moviescomingsoon"})
+    kodiutils.endScript()
 
-def loadMovies(page = 1, intheaters = True):
-	global thisPlugin
-	for movie in getMoviesList(page, intheaters):
-		if (isinstance( movie['title'], ( int, long ) )):
-			if ( movie['title'] == 32002):
-				addDirectoryItem(__language__(movie['title']), movie['id'], "moviesintheaters", "")
-			else:
-				addDirectoryItem(__language__(movie['title']), movie['id'], "comingweek", "")
-		else:
-			quality = int(__addon__.getSetting( 'Quality' ))
-			if (quality == 2):
-				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/140x200/%s.png" % movie['id'])
-			elif (quality == 1):
-				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/235x336/%s.jpg" % movie['id'])
-			else:
-				addDirectoryItem(movie['title'], movie['id'], "videos", "http://mr.comingsoon.it/imgdb/locandine/big/%s.jpg" % movie['id'])
-	xbmcplugin.endOfDirectory(thisPlugin)
+def addTheatersList(page = 1):
+    page = int(page)
+    kodiutils.setContent('movies')
+    maxPage, movies = getTheatersList(page, kodiutils.getSettingAsBool('fullDetails'))
+    addMoviesList(movies)
+    if page < maxPage:
+        kodiutils.addListItem(kodiutils.LANGUAGE(32002), {"mode": "moviesintheaters", "page": page + 1 })
+    kodiutils.endScript()
+
+def addNextReleasesList(offset = 0):
+    offset=int(offset)
+    kodiutils.setContent('movies')
+    maxPage, movies = getNextReleasesList(offset, kodiutils.getSettingAsBool('fullDetails'))
+    addMoviesList(movies)
+    if offset <= 0:
+    	kodiutils.addListItem(kodiutils.LANGUAGE(32003), {"mode": "comingweek", "offset": offset - 7 })
+    if offset >= 0:
+    	kodiutils.addListItem(kodiutils.LANGUAGE(32004), {"mode": "comingweek", "offset": offset + 7 })
+    kodiutils.endScript()
+
+def addMoviesList(movies):
+    for movie in movies:
+        movie['mediatype']='movie'
+        kodiutils.addListItem(movie['title'], {"id": movie['id'], "mode": "videos" }, videoInfo=movie, 
+            thumb=movie['image'])
 
 def loadDates(offset = 0):
-	global thisPlugin
-	try: 
-		offset = int(offset)
-	except:
-		offset = 0
-	d = datetime.date.today() + datetime.timedelta(offset)
-	days_behind = d.weekday() - 3
-	if days_behind < 0: # Target day already happened this week
-		days_behind += 7
-	nextthursday = d - datetime.timedelta(days_behind)
-	for x in range(0,9):
-		addDirectoryItem(__language__(32007) + " " + str(nextthursday + datetime.timedelta(x * 7)), offset + (x * 7), "comingweek"	, "")
-	addDirectoryItem(__language__(32001), offset - 63, "moviescomingsoon", "")
-	addDirectoryItem(__language__(32002), offset + 63, "moviescomingsoon", "")
-	xbmcplugin.endOfDirectory(thisPlugin)
+    offset = int(offset)
+    d = datetime.date.today() + datetime.timedelta(offset)
+    offset_days = 3 - d.weekday()
+    nextthursday = d + datetime.timedelta(offset_days)
+    for x in range(0,9):
+        kodiutils.addListItem(kodiutils.LANGUAGE(32007) + " " + str(nextthursday + datetime.timedelta(x * 7)), {"offset": offset + (x * 7), "mode": "comingweek" })
+    if offset <= 0:
+        kodiutils.addListItem(kodiutils.LANGUAGE(32001), {"mode": "moviescomingsoon", "offset": offset - 63 })
+    if offset >= 0:
+        kodiutils.addListItem(kodiutils.LANGUAGE(32002), {"mode": "moviescomingsoon", "offset": offset + 63 })
+    kodiutils.endScript()
 
 def loadVideos(id):
-	global thisPlugin
-	for video in getMoviesVideos(id):
-		quality =int(__addon__.getSetting( 'Quality' ))
-		if (quality == 2):
-			addLinkItem(video['name'], video['vid'], "videourl", "http://mr.comingsoon.it/imgdb/video/%s_icov.jpg" % video['vid'])
-		else:
-			addLinkItem(video['name'], video['vid'], "videourl", "http://mr.comingsoon.it/imgdb/video/%s_big.jpg" % video['vid'])
-	xbmcplugin.endOfDirectory(thisPlugin)
+    kodiutils.setContent('videos')
+    for video in getMovieVideos(id):
+        kodiutils.addListItem(video['title'], {"id": video['id'], "mode": "videourl" }, thumb=video['image'], videoInfo={'mediatype': 'video'}, isFolder=False)
+    kodiutils.endScript()
 
 def watchVideo(id):
-	urls = getVideoUrls(id)
-	url = ""
-	PreferHD = (__addon__.getSetting( 'PreferHD' ) == 'true')
-	if (PreferHD and 'hd' in urls):
-		url = urls['hd']
-	elif ('sd' in urls):
-		url = urls['sd']
-	elif ('hd' in urls):
-		url = urls['hd']
-	else:
-		log('No links found')
-		return
-	listItem = xbmcgui.ListItem(path=url)
-	xbmcplugin.setResolvedUrl(thisPlugin, True, listItem)
+    urls = getVideoUrls(id)
+    if kodiutils.getSettingAsBool('PreferHD') and 'hd' in urls:
+        kodiutils.setResolvedUrl(urls['hd'])
+    elif ('sd' in urls):
+        kodiutils.setResolvedUrl(urls['sd'])
+    elif ('hd' in urls):
+        kodiutils.setResolvedUrl(urls['sd'])
+    kodiutils.log('No links found')
+    kodiutils.setResolvedUrl(solved=False)
 
-def getParams():
-	param = []
-	paramstring = sys.argv[2]
-	if len(paramstring) >= 2:
-		params = sys.argv[2]
-		cleanedparams = params.replace('?', '')
-		if (params[len(params) - 1] == '/'):
-			params = params[0:len(params) - 2]
-		pairsofparams = cleanedparams.split('&')
-		param = {}
-		for i in range(len(pairsofparams)):
-			splitparams = {}
-			splitparams = pairsofparams[i].split('=')
-			if (len(splitparams)) == 2:
-				param[splitparams[0]] = splitparams[1]
-								
-		return param
-
-if not sys.argv[2]:
-	loadList()
+params = staticutils.getParams()
+if not params or 'mode' not in params:
+    loadList()
 else:
-	params = getParams()
-	if params['mode'] == "moviesintheaters":
-		if ("id" in params):
-			loadMovies(params['id'])
-		else:
-			loadMovies()
-	elif params['mode'] == "moviescomingsoon":
-		if ("id" in params):
-			loadDates(params['id'])
-		else:
-			loadDates()
-	elif params['mode'] == "comingweek":
-		if ("id" in params):
-			loadMovies(params['id'], False)
-		else:
-			loadMovies(0, False)
-	elif params['mode'] == "videos":
-		loadVideos(params['id'])
-	elif params['mode'] == "videourl":
-		watchVideo(params['id'])
-	else:
-		loadList()
+    if params['mode'] == "moviesintheaters":
+        addTheatersList(params.get('page', 1))
+    elif params['mode'] == "moviescomingsoon":
+        loadDates(params.get('offset', 0))
+    elif params['mode'] == "comingweek":
+        addNextReleasesList(params.get('offset', 0))
+    elif params['mode'] == "videos":
+        loadVideos(params['id'])
+    elif params['mode'] == "videourl":
+        watchVideo(params['id'])
+    else:
+        loadList()

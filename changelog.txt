@@ -1,3 +1,9 @@
+1.1.0
+Rewrite part of the code to use phate89 library
+Removed previous page item (kodi provide methods to go back)
+Added an option to get more info for the movies (enabled by default)
+Fixed pagination of dates
+
 1.0.1
 Added localized strings
 Improved checks
